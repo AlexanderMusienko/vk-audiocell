@@ -30,4 +30,12 @@ export const MUSIC_MOCK = [
     authorName: "Jim Croce",
     duration: 145000,
   },
+  {
+    id: "example",
+    src: unforgivenAudio,
+    coverSrc: null,
+    songName: "Трек",
+    authorName: "Исполнитель",
+    duration: 203000,
+  },
 ];
