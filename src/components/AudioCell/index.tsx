@@ -1,5 +1,9 @@
-import { CSSProperties, FC, useMemo, useState, useEffect, useRef } from "react";
-import { Icon16MoreVertical, Icon20GraphOutline } from "@vkontakte/icons";
+import { FC, RefObject, useEffect, useMemo, useState } from "react";
+import {
+  Icon16MoreVertical,
+  Icon20GraphOutline,
+  Icon20Play,
+} from "@vkontakte/icons";
 import {
   IconButton,
   Image,
@@ -9,98 +13,114 @@ import {
 } from "@vkontakte/vkui";
 import defaultCover from "@/assets/images/audio-cover.png";
 import { formatDuration } from "@/shared/utils/duration";
-import { observer } from "mobx-react-lite";
 import { s } from "./styles";
-import { useStores } from "@/stores/root.store";
+import cn from "./styles/audiocell.module.css";
 
-export type TAudioCellProps = {
+export type TAudioCellEvent = {
+  id: string | number;
+  audioSrc: string;
+};
+
+type TAudioCellProps = {
   coverSrc?: string | null;
   songName: string;
   authorName: string;
   duration: number; // ms
   id: string | number;
   src: string;
+  onClick?: (event: TAudioCellEvent) => void;
+  isActive: boolean;
+  audioRef: RefObject<HTMLAudioElement>;
 };
 
-export const AudioCell: FC<TAudioCellProps> = observer(
-  ({ coverSrc, songName, authorName, duration, id, src }) => {
-    const {
-      audioStore: { activeTrackID, setActiveTrack },
-    } = useStores();
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [playbackTime, setPlaybackTime] = useState(0);
-    const audioRef = useRef<HTMLAudioElement>(null); // Reference for the audio element
-    const noop = () => {};
+export const AudioCell: FC<TAudioCellProps> = ({
+  coverSrc,
+  songName,
+  authorName,
+  duration,
+  id,
+  isActive,
+  src,
+  onClick,
+  audioRef,
+}) => {
+  const [currentDurationOfActiveTrack, setCurrentDurationOfActiveTrack] =
+    useState(0);
+  const [isPaused, setIsPaused] = useState(false);
 
-    const isActive = useMemo(
-      () => !!id && activeTrackID === id,
-      [activeTrackID, id]
-    );
+  const handleOnEnd = () => {
+    console.log("ended");
+  };
 
-    useEffect(() => {
-      if (isActive && audioRef.current) {
-        audioRef.current.play();
-      } else {
-        audioRef.current?.pause();
-      }
-    }, [isActive]);
+  const handleClick = () => {
+    setIsPaused(false);
+    if (isActive) {
+      setIsPaused(!isPaused);
+    }
+    onClick && onClick({ id: id, audioSrc: src });
+  };
 
-    useEffect(() => {
-      const audio = audioRef.current;
-      const updatePlaybackTime = () => {
-        if (audio) {
-          setPlaybackTime(audio.currentTime * 1000); // Update playback time in state
-        }
-      };
+  const durationText = useMemo(
+    () =>
+      isActive
+        ? formatDuration(currentDurationOfActiveTrack * 1000)
+        : formatDuration(duration),
+    [duration, isActive, currentDurationOfActiveTrack]
+  );
 
-      audio?.addEventListener("timeupdate", updatePlaybackTime);
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
 
-      return () => {
-        audio?.removeEventListener("timeupdate", updatePlaybackTime);
-      };
-    }, []);
-
-    const durationText = formatDuration(duration);
-
-    const handleClick = () => {
-      setActiveTrack(id, src);
+    const handleTimeUpdate = () => {
+      setCurrentDurationOfActiveTrack(Math.floor(audio.currentTime));
     };
 
-    return (
-      <SimpleCell
-        onClickCapture={handleClick}
-        key={id}
-        before={
-          <Image size={40} src={coverSrc || defaultCover}>
-            {isActive && (
-              <Image.Overlay visibility="always">
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("ended", handleOnEnd);
+
+    return () => {
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("ended", handleOnEnd);
+    };
+  }, [audioRef]);
+
+  return (
+    <SimpleCell
+      onClickCapture={handleClick}
+      key={id}
+      before={
+        <Image size={40} src={coverSrc || defaultCover}>
+          {isActive && (
+            <Image.Overlay visibility="always" className={cn.imageOverlay}>
+              {isPaused ? (
+                <Icon20Play color="var(--vkui--color_icon_contrast)" />
+              ) : (
                 <Icon20GraphOutline color="var(--vkui--color_icon_contrast)" />
-              </Image.Overlay>
-            )}
-          </Image>
-        }
-        after={
-          <>
-            <Text style={s.durationStyle}>{durationText}</Text>
-            <IconButton>
-              <VisuallyHidden>Дополнительные действия</VisuallyHidden>
-              <Icon16MoreVertical color="var(--vkui--color_button_icon)" />
-            </IconButton>
-          </>
-        }
-        subtitle={
-          <Text normalize style={s.authorNameStyle}>
-            {authorName}
-          </Text>
-        }
-        onClick={noop}
-        children={
-          <Text normalize style={s.songNameStyle}>
-            <audio ref={audioRef} src={src} preload="none" hidden />
-            {songName}
-          </Text>
-        }
-      ></SimpleCell>
-    );
-  }
-);
+              )}
+            </Image.Overlay>
+          )}
+        </Image>
+      }
+      after={
+        <>
+          <Text style={s.durationStyle}>{durationText}</Text>
+          <IconButton>
+            <VisuallyHidden>Дополнительные действия</VisuallyHidden>
+            <Icon16MoreVertical color="var(--vkui--color_button_icon)" />
+          </IconButton>
+        </>
+      }
+      subtitle={
+        <Text normalize style={s.authorNameStyle}>
+          {authorName}
+        </Text>
+      }
+      children={
+        <Text normalize style={s.songNameStyle}>
+          {songName}
+        </Text>
+      }
+    />
+  );
+};
