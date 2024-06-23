@@ -12,6 +12,6 @@ export default defineConfig({
       "@": path.resolve(__dirname, "src"),
     },
   },
-  base: "/vk-audiocell/",
+  base: "/vk-audiocell",
   plugins: [react()],
 });
